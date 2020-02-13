@@ -1,4 +1,4 @@
-import { Unavailability } from '../../src/components/user';
+import { Unavailability } from '../../src/components/user/unavailability';
 import { gql } from 'apollo-server-core';
 
 export const fragments = {
@@ -121,6 +121,22 @@ export const fragments = {
         canEdit
       }
       institution {
+        value
+        canRead
+        canEdit
+      }
+    }
+  `,
+  budget: gql`
+    fragment budget on Budget {
+      id
+      createdAt
+      status {
+        value
+        canRead
+        canEdit
+      }
+      budgetDetails {
         value
         canRead
         canEdit
