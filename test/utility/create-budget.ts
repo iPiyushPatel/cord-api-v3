@@ -10,13 +10,11 @@ import { TestApp } from './create-app';
 import { fragments } from './fragments';
 import { gql } from 'apollo-server-core';
 import { isValid } from 'shortid';
-import { Organization } from 'src/components/organization';
 
 export async function createBudget(
   app: TestApp,
   input: Partial<CreateBudgetInput> = {},
 ) {
-  console.log('k...');
   const budget: CreateBudgetInput = {
     status: BudgetStatus.Pending,
     budgetDetails: BudgetDetails[0],
@@ -45,7 +43,6 @@ export async function createBudget(
 
   const actual: Budget | undefined = result.createBudget?.budget;
   expect(actual).toBeTruthy();
-  console.log('actualk', actual);
   expect(isValid(actual.id)).toBe(true);
   expect(actual.status).toBe(budget.status);
 

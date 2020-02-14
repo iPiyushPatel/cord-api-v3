@@ -2,152 +2,123 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { generate, isValid } from 'shortid';
 import { createTestApp, TestApp } from './utility';
+import { Budget } from '../src/components/budget/budget';
+import { createBudget } from './utility/create-budget';
+import { createSession } from './utility/create-session';
+import { createUser } from './utility/create-user';
+import { fragments } from './utility/fragments';
+import { gql } from 'apollo-server-core';
+import { BudgetStatus } from '../src/components/budget/budget';
 
-async function createBudget(
-  app: INestApplication,
-  budgetStatus: string,
-): Promise<string> {
-  let budgetId = '';
-  await request(app.getHttpServer())
-    .post('/graphql')
-    .send({
-      operationName: null,
-      query: `
-    mutation {
-      createBudget (input: { budget: { status: Pending } }){
-        budget {
-        id
-        }
-      }
-    }
-    `,
-    })
-    .then(({ body }) => {
-      budgetId = body.data.createBudget.budget.id;
-    });
-  return budgetId;
-}
-
-describe.skip('Budget e2e', () => {
+describe('budget e2e', () => {
   let app: TestApp;
 
   beforeAll(async () => {
     app = await createTestApp();
-  });
-
-  it('create budget', async () => {
-    const budgetStatus = 'Pending';
-    await request(app.getHttpServer())
-      .post('/graphql')
-      .send({
-        operationName: null,
-        query: `
-        mutation {
-          createBudget (input: { budget: { status: ${budgetStatus} } }){
-            budget {
-            id
-            status
-            }
-          }
-        }
-        `,
-      })
-      .expect(({ body }) => {
-        const budgetId = body.data.createBudget.budget.id;
-        expect(isValid(budgetId)).toBe(true);
-        expect(body.data.createBudget.budget.status).toBe(budgetStatus);
-      })
-      .expect(200);
-  });
-
-  it('read one budget by id', async () => {
-    const budgetStatus = 'Pending';
-
-    // create budget first
-    const budgetId = await createBudget(app, budgetStatus);
-
-    // test reading new org
-    await request(app.getHttpServer())
-      .post('/graphql')
-      .send({
-        operationName: null,
-        query: `
-        query {
-          readBudget ( input: { budget: { id: "${budgetId}" } }){
-            budget{
-            id
-            status
-            }
-          }
-        }
-        `,
-      })
-      .expect(({ body }) => {
-        expect(body.data.readBudget.budget.id).toBe(budgetId);
-        expect(body.data.readBudget.budget.status).toBe(budgetStatus);
-      })
-      .expect(200);
-  });
-
-  it('update budget', async () => {
-    const budgetStatus = 'Pending';
-    const budgetStatusNew = 'Current';
-
-    // create budget first
-    const budgetId = await createBudget(app, budgetStatus);
-
-    return request(app.getHttpServer())
-      .post('/graphql')
-      .send({
-        operationName: null,
-        query: `
-        mutation {
-          updateBudget (input: { budget: {
-            id: "${budgetId}",
-            status: ${budgetStatusNew}
-          } }){
-            budget {
-            id
-            status
-            }
-          }
-        }
-        `,
-      })
-      .expect(({ body }) => {
-        expect(body.data.updateBudget.budget.id).toBe(budgetId);
-        expect(body.data.updateBudget.budget.status).toBe(budgetStatusNew);
-      })
-      .expect(200);
-  });
-
-  it('delete budget', async () => {
-    const budgetStatus = 'budgetStatus' + Date.now();
-
-    // create budget first
-    const budgetId = await createBudget(app, budgetStatus);
-
-    return request(app.getHttpServer())
-      .post('/graphql')
-      .send({
-        operationName: null,
-        query: `
-        mutation {
-          deleteBudget (input: { budget: { id: "${budgetId}" } }){
-            budget {
-            id
-            }
-          }
-        }
-        `,
-      })
-      .expect(({ body }) => {
-        expect(body.data.deleteBudget.budget.id).toBe(budgetId);
-      })
-      .expect(200);
+    await createSession(app);
+    await createUser(app);
   });
 
   afterAll(async () => {
     await app.close();
+  });
+
+  it('create a budget', async () => {
+    const budget = await createBudget(app);
+
+    expect(budget.id).toBeDefined();
+  });
+
+  it('read one budget by id', async () => {
+    const budget = await createBudget(app);
+
+    try {
+      const { budget: actual } = await app.graphql.query(
+        gql`
+          query budget($id: ID!) {
+            budget(id: $id) {
+              ...budget
+            }
+          }
+          ${fragments.budget}
+        `,
+        {
+          id: budget.id,
+        },
+      );
+
+      expect(actual.id).toBe(budget.id);
+      expect(isValid(actual.id)).toBeTruthy();
+
+      expect(actual.status.value).toEqual(budget.status);
+    } catch (e) {
+      console.error(e);
+    }
+  });
+
+  // UPDATE Project
+  it.skip('update budget', async () => {
+    const budget = await createBudget(app);
+    const newStatus = BudgetStatus.Current;
+
+    const result = await app.graphql.mutate(
+      gql`
+        mutation updateBudget($input: UpdateBudgetInput!) {
+          updateBudget(input: $input) {
+            budget {
+              ...budget
+            }
+          }
+        }
+        ${fragments.budget}
+      `,
+      {
+        input: {
+          budget: {
+            id: budget.id,
+            name: newStatus,
+          },
+        },
+      },
+    );
+    const updated = result?.updateBudget?.budget;
+    expect(updated).toBeTruthy();
+    expect(updated.id).toBe(budget.id);
+    expect(updated.name.value).toBe(newStatus);
+  });
+
+  // DELETE Project
+  it('delete budget', async () => {
+    const budget = await createBudget(app);
+
+    const result = await app.graphql.mutate(
+      gql`
+        mutation deleteProject($id: ID!) {
+          deleteProject(id: $id)
+        }
+      `,
+      {
+        id: budget.id,
+      },
+    );
+
+    expect(result.deleteBudget).toBeTruthy();
+    try {
+      await app.graphql.query(
+        gql`
+          query budget($id: ID!) {
+            budget(id: $id) {
+              ...budget
+            }
+          }
+          ${fragments.budget}
+        `,
+        {
+          id: budget.id,
+        },
+      );
+    } catch (e) {
+      expect(e.response.statusCode).toBe(404);
+    }
   });
 });

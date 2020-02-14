@@ -143,4 +143,22 @@ export const fragments = {
       }
     }
   `,
+  project: gql`
+    fragment project on Project {
+      id
+      createdAt
+      name
+      deptId
+      status
+      locationId
+      mouStart
+      mouEnd
+      partnerships
+      sensitivity
+      team
+      budgets
+      estimatedSubmission
+      engagements
+    }
+  `,
 };

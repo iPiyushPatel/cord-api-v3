@@ -2,165 +2,120 @@ import * as request from 'supertest';
 import { INestApplication } from '@nestjs/common';
 import { isValid, generate } from 'shortid';
 import { createTestApp, TestApp } from './utility';
+import { createProject } from './utility/create-project';
+import { createSession } from './utility/create-session';
+import { createUser } from './utility/create-user';
+import { fragments } from './utility/fragments';
+import { gql } from 'apollo-server-core';
 
-async function createProject(
-  app: INestApplication,
-  projectName: string,
-): Promise<string> {
-  let projectId = '';
-  await request(app.getHttpServer())
-    .post('/graphql')
-    .send({
-      operationName: null,
-      query: `
-    mutation {
-      createProject (input: { project: { name: "${projectName}" } }){
-        project {
-        id,
-        name
-        }
-      }
-    }
-    `,
-    })
-    .then(({ body }) => {
-      projectId = body.data.createProject.project.id;
-    });
-  return projectId;
-}
-
-describe.skip('Project e2e', () => {
+describe('Project e2e', () => {
   let app: TestApp;
 
   beforeAll(async () => {
     app = await createTestApp();
-  });
-
-  it('create project', async () => {
-    const projectName = 'projectName' + generate();
-    await request(app.getHttpServer())
-      .post('/graphql')
-      .send({
-        operationName: null,
-        query: `
-        mutation {
-          createProject (input: { project: { name: "${projectName}" } }){
-            project {
-            id
-            name
-            }
-          }
-        }
-        `,
-      })
-      .expect(({ body }) => {
-        const projId = body.data.createProject.project.id;
-        expect(isValid(projId)).toBe(true);
-        expect(body.data.createProject.project.name).toBe(projectName);
-      })
-      .expect(200);
-  });
-
-  it('read one project by id', async () => {
-    const projectName = 'projectName' + Date.now();
-
-    // create project first
-    const projId = await createProject(app, projectName);
-
-    // test reading new org
-    await request(app.getHttpServer())
-      .post('/graphql')
-      .send({
-        operationName: null,
-        query: `
-        query {
-          readProject ( input: { project: { id: "${projId}" } }){
-            project{
-            id
-            name
-            }
-          }
-        }
-        `,
-      })
-      .expect(({ body }) => {
-        expect(body.data.readProject.project.id).toBe(projId);
-        expect(body.data.readProject.project.name).toBe(projectName);
-      })
-      .expect(200);
-  });
-
-  it('update project', async () => {
-    const projectName = 'projectOld' + Date.now();
-    const projectNameNew = 'projectNew' + Date.now();
-
-    // create project first
-    const projId = await createProject(app, projectName);
-
-    return request(app.getHttpServer())
-      .post('/graphql')
-      .send({
-        operationName: null,
-        query: `
-        mutation {
-          updateProject (input: { project: {
-            id: "${projId}",
-            name: "${projectNameNew}",
-            deptId: null,
-            status: null,
-            location: null,
-            publicLocation: null,
-            mouStart: null,
-            mouEnd: null,
-            partnerships: null,
-            sensitivity: null,
-            team: null,
-            budgets: null,
-            estimatedSubmission: null,
-            engagements: null,
-          } }){
-            project {
-            id
-            name
-            }
-          }
-        }
-        `,
-      })
-      .expect(({ body }) => {
-        expect(body.data.updateProject.project.id).toBe(projId);
-        expect(body.data.updateProject.project.name).toBe(projectNameNew);
-      })
-      .expect(200);
-  });
-
-  it('delete project', async () => {
-    const projectName = 'projectName' + Date.now();
-
-    // create project first
-    const projId = await createProject(app, projectName);
-
-    return request(app.getHttpServer())
-      .post('/graphql')
-      .send({
-        operationName: null,
-        query: `
-        mutation {
-          deleteProject (input: { project: { id: "${projId}" } }){
-            project {
-            id
-            }
-          }
-        }
-        `,
-      })
-      .expect(({ body }) => {
-        expect(body.data.deleteProject.project.id).toBe(projId);
-      })
-      .expect(200);
+    await createSession(app);
+    await createUser(app);
   });
 
   afterAll(async () => {
     await app.close();
+  });
+
+  it('create a project', async () => {
+    const project = await createProject(app);
+
+    expect(project.id).toBeDefined();
+  });
+
+  it('read one project by id', async () => {
+    const project = await createProject(app);
+
+    try {
+      const { project: actual } = await app.graphql.query(
+        gql`
+          query project($id: ID!) {
+            project(id: $id) {
+              ...project
+            }
+          }
+          ${fragments.project}
+        `,
+        {
+          id: project.id,
+        },
+      );
+      expect(actual.id).toBe(project.id);
+      expect(isValid(actual.id)).toBeTruthy();
+
+      expect(actual.name.value).toEqual(project.name);
+    } catch (e) {
+      console.error(e);
+    }
+  });
+
+  // UPDATE Project
+  it.skip('update project', async () => {
+    const project = await createProject(app);
+    const newName = 'olive';
+
+    const result = await app.graphql.mutate(
+      gql`
+        mutation updateLanguage($input: UpdateLanguageInput!) {
+          updateProject(input: $input) {
+            project {
+              ...project
+            }
+          }
+        }
+        ${fragments.project}
+      `,
+      {
+        input: {
+          project: {
+            id: project.id,
+            name: newName,
+          },
+        },
+      },
+    );
+    const updated = result?.updateLanguage?.project;
+    expect(updated).toBeTruthy();
+    expect(updated.id).toBe(project.id);
+    expect(updated.name.value).toBe(newName);
+  });
+
+  // DELETE Project
+  it('delete project', async () => {
+    const project = await createProject(app);
+
+    const result = await app.graphql.mutate(
+      gql`
+        mutation deleteProject($id: ID!) {
+          deleteProject(id: $id)
+        }
+      `,
+      {
+        id: project.id,
+      },
+    );
+
+    expect(result.deleteProject).toBeTruthy();
+    try {
+      await app.graphql.query(
+        gql`
+          query project($id: ID!) {
+            project(id: $id) {
+              ...project
+            }
+          }
+          ${fragments.project}
+        `,
+        {
+          id: project.id,
+        },
+      );
+    } catch (e) {
+      expect(e.response.statusCode).toBe(404);
+    }
   });
 });
