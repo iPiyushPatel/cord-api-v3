@@ -5,40 +5,34 @@ import {
   ObjectType,
   registerEnumType,
 } from 'type-graphql';
-import { Organization } from '../organization';
 
-@ObjectType()
-@InputType('BudgetInput')
+import { Organization } from '../organization';
+import { Resource } from '../../common';
+
+@ObjectType({
+  implements: Resource,
+})
 export class Budget {
   @Field(() => ID)
   id: string;
 
   @Field(type => BudgetStatus, { nullable: true })
   status: BudgetStatus;
-  @Field(type => [BudgetDetails], { nullable: true })
-  budgetDetails: BudgetDetails[];
-}
 
-export interface Budget {
-  id: string;
-  status: BudgetStatus;
+  @Field(type => [BudgetDetails], { nullable: true })
   budgetDetails: BudgetDetails[];
 }
 
 @ObjectType()
 @InputType('BudgetDetailsInput')
 export class BudgetDetails {
-  organization: Organization;
+  @Field({nullable: true})
+  organization: string;
 
   @Field({ nullable: true })
   fiscalYear: number;
 
   @Field({ nullable: true })
-  amount: number;
-}
-export interface BudgetDetails {
-  organization: Organization;
-  fiscalYear: number;
   amount: number;
 }
 

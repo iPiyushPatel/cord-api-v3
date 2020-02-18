@@ -10,7 +10,10 @@ import {
   UpdateBudgetOutputDto,
   DeleteBudgetInputDto,
   DeleteBudgetOutputDto,
-} from './budget.dto';
+  CreateBudgetInput,
+  CreateBudgetOutput,
+} from './dto';
+import { Session, ISession } from '../auth';
 
 @Resolver(of => Budget)
 export class BudgetResolver {
@@ -20,9 +23,11 @@ export class BudgetResolver {
     description: 'Create a Budget',
   })
   async createBudget(
-    @Args('input') { budget: input }: CreateBudgetInputDto,
-  ): Promise<CreateBudgetOutputDto> {
-    return await this.budgetService.create(input);
+    @Session() session: ISession,
+    @Args('input') { budget: input }: CreateBudgetInput,
+  ): Promise<CreateBudgetOutput> {
+    const budget = await this.budgetService.create(input, session);
+    return {budget};
   }
   @Query(returns => ReadBudgetOutputDto, {
     description: 'Read one Budget by id',

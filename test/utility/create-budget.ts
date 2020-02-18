@@ -1,23 +1,25 @@
 import * as faker from 'faker';
 
-import { CreateBudgetInput } from '../../src/components/budget/budget.dto';
 import {
   Budget,
-  BudgetStatus,
   BudgetDetails,
+  BudgetStatus,
 } from '../../src/components/budget/budget';
+
+import { CreateBudget } from '../../src/components/budget/dto';
 import { TestApp } from './create-app';
+import { createOrganization } from './create-organization';
 import { fragments } from './fragments';
 import { gql } from 'apollo-server-core';
 import { isValid } from 'shortid';
 
 export async function createBudget(
   app: TestApp,
-  input: Partial<CreateBudgetInput> = {},
+  input: Partial<CreateBudget> = {},
 ) {
-  const budget: CreateBudgetInput = {
+  const budget: CreateBudget = {
     status: BudgetStatus.Pending,
-    budgetDetails: BudgetDetails[0],
+    budgetDetails: [],
     ...input,
   };
 
@@ -35,7 +37,7 @@ export async function createBudget(
     {
       input: {
         budget: {
-          ...budget,
+          budget,
         },
       },
     },

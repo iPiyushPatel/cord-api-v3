@@ -1,4 +1,5 @@
 import {
+  CreateBudget,
   CreateBudgetInput,
   CreateBudgetInputDto,
   CreateBudgetOutputDto,
@@ -11,21 +12,31 @@ import {
   UpdateBudgetInput,
   UpdateBudgetInputDto,
   UpdateBudgetOutputDto,
-} from './budget.dto';
+} from './dto';
 
-import { DatabaseService } from '../../core/database.service';
+import { Budget } from './budget';
+import { DatabaseService, Logger, ILogger } from '../../core';
 import { Injectable } from '@nestjs/common';
+import { PropertyUpdaterService } from '../../core/database/property-updater.service';
 import { generate } from 'shortid';
+import { ISession } from '../auth';
+
 @Injectable()
 export class BudgetService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly propertyUpdater: PropertyUpdaterService,
+    @Logger('user:service') private readonly logger: ILogger,
+  ) {}
 
-  async create(input: CreateBudgetInput): Promise<CreateBudgetOutputDto> {
-    const response = new CreateBudgetOutputDto();
-    const session = this.db.driver.session();
+  async create(input: CreateBudget, session: ISession): Promise<Budget> {
+    this.logger.info(
+      `Mutation create budget by ${session.userId}`,
+    );
     const id = generate();
-    await session
-      .run(
+    const result = await this.db
+      .query()
+      .raw(
         'MERGE (budget:Budget {active: true, owningOrg: "seedcompany", id: $id}) ON CREATE SET budget.id = $id, budget.status  = $status, budget.timestamp = datetime() RETURN budget.id as id, budget.status as status, budget.budgetDetails as budgetDetails',
         {
           id,
@@ -33,17 +44,20 @@ export class BudgetService {
           budgetDetails: input.budgetDetails,
         },
       )
-      .then(result => {
-        response.budget.id = result.records[0].get('id');
-        response.budget.status = result.records[0].get('status');
-        response.budget.budgetDetails = result.records[0].get('budgetDetails');
-      })
-      .catch(error => {
-        console.log(error);
-      })
-      .then(() => session.close());
+      .first();
 
-    return response;
+    if (!result) {
+      this.logger.error(
+        `Could not create budget by ${session.userId}`,
+      );
+      throw new Error('Could not create language');
+    }
+
+    return {
+      id: result.id,
+      status: result.status,
+      budgetDetails: result.budgetDetails,
+    };
   }
   async readOne(input: ReadBudgetInput): Promise<ReadBudgetOutputDto> {
     const response = new ReadBudgetOutputDto();
