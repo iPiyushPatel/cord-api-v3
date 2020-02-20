@@ -16,18 +16,21 @@ export class Budget {
   @Field(() => ID)
   id: string;
 
-  @Field(type => BudgetStatus, { nullable: true })
+  @Field(type => BudgetStatus)
   status: BudgetStatus;
 
-  @Field(type => [BudgetDetails], { nullable: true })
-  budgetDetails: BudgetDetails[];
+  @Field(type => [BudgetEntry])
+  records: BudgetRecords[];
 }
 
 @ObjectType()
-@InputType('BudgetDetailsInput')
-export class BudgetDetails {
-  @Field({nullable: true})
-  organization: string;
+@InputType('BudgetRecordInput')
+export class BudgetRecord {
+  @Field(() => ID)
+  id: string;
+
+  @Field()
+  organization: Organization;
 
   @Field({ nullable: true })
   fiscalYear: number;
@@ -44,3 +47,9 @@ export enum BudgetStatus {
 }
 
 registerEnumType(BudgetStatus, { name: 'BudgetStatus' });
+
+// 1) initialize a pending - with records pre-made, with FY and financial partners and create the relationship to the project
+// 2) current - immutable when project is active
+// 3) superceded is an action
+// 4)  CRUD record, update only the amount
+// 5) Update Budget, update the status,
