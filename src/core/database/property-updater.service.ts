@@ -180,12 +180,12 @@ export class PropertyUpdaterService {
       aclReadProp || `canRead${upperFirst(key as string)}`;
     const aclEditPropName = `canEdit${upperFirst(key as string)}`;
     const query = `
-    match  (token:Token { 
+    match  (token:Token {
       active: true,
       value: $token
     })
     <-[:token { active: true }]-
-    (requestingUser:User { 
+    (requestingUser:User {
       active: true,
       id: $userId
     })

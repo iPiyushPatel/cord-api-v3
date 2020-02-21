@@ -84,7 +84,7 @@ export class OrganizationService {
         owningOrgId: session.owningOrgId,
       })
       .first();
-    
+
     if (!result) {
       throw new NotFoundException('Could not find organization');
     }
